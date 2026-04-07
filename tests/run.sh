@@ -84,6 +84,14 @@ run_fixture() {
         ;;
       commit-checks)
         case "$fixture_name" in
+          *secret-in-code-only*)
+            mkdir -p src
+            echo "x=1" > src/main.py
+            git add src/main.py
+            git commit -q -m "feat: init"
+            printf 'AWS_KEY = "AKIAIOSFODNN7EXAMPLE1"\ndo_stuff()\n' > src/config.py
+            git add src/config.py
+            ;;
           *aws-key-staged*)
             mkdir -p src
             echo "x=1" > src/main.py

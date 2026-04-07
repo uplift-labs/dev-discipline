@@ -27,9 +27,9 @@ esac
 
 # Filter out branch creation (safe even with dirty worktree)
 case "$CMD" in
-  *" -b "*|*" -b"$|*" -B "*|*" -B"$) exit 0 ;;
+  *" -b "*|*" -b"|*" -B "*|*" -B") exit 0 ;;
   *"--orphan"*)                       exit 0 ;;
-  *" -c "*|*" -c"$|*" -C "*|*" -C"$) exit 0 ;;
+  *" -c "*|*" -c"|*" -C "*|*" -C") exit 0 ;;
   *"--create"*|*"--force-create"*)    exit 0 ;;
 esac
 

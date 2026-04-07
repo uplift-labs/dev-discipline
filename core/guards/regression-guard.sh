@@ -15,7 +15,7 @@ INPUT=$(cat)
 . "$(dirname "$0")/../lib/json-field.sh"
 
 # Trigger on git push OR git merge into main/master
-CMD=$(json_field "command" "$INPUT")
+CMD=$(json_field_long "command" "$INPUT")
 [ -z "$CMD" ] && exit 0
 case "$CMD" in
   *git\ push*) ;;

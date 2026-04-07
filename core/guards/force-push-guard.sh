@@ -28,14 +28,14 @@ case "$CMD" in
 esac
 case "$CMD" in
   *"--force"*) HAS_FORCE=1 ;;
-  *" -f "*|*" -f"$) HAS_FORCE=1 ;;
+  *" -f "*|*" -f") HAS_FORCE=1 ;;
 esac
 # --force-with-lease contains --force as substring; disambiguate
 if [ "$HAS_FORCE_LEASE" -eq 1 ] && [ "$HAS_FORCE" -eq 1 ]; then
   # Check if there's a standalone --force (not just --force-with-lease)
   _stripped=$(printf '%s' "$CMD" | sed 's/--force-with-lease//g')
   case "$_stripped" in
-    *"--force"*|*" -f "*|*" -f"$) HAS_FORCE=1 ;;
+    *"--force"*|*" -f "*|*" -f") HAS_FORCE=1 ;;
     *) HAS_FORCE=0 ;;
   esac
 fi
