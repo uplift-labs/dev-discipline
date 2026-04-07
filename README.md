@@ -50,6 +50,18 @@ touch .dev-discipline/.tdd-mode
 export DEV_DISCIPLINE_TDD_MODE=1
 ```
 
+### dead-branch-guard
+Warns or blocks when switching branches (`git checkout`, `git switch`) with uncommitted changes. Git silently carries uncommitted changes to the target branch — this guard prevents accidental cross-branch contamination. Blocks on protected branches (main/master), warns on others.
+
+### force-push-guard
+Blocks `git push --force` to protected branches (main/master). Asks for confirmation on force push to feature branches. Allows `--force-with-lease` to non-protected branches without interference.
+
+### main-branch-commit-guard
+Warns when committing directly to a protected branch (main/master). Encourages feature branch + PR workflow. Allows merge commits and `--allow-empty` commits.
+
+### todo-debt-tracker
+Counts net new `TODO`/`FIXME`/`HACK`/`XXX` markers in uncommitted changes at session end. Warns when new markers appear; asks for confirmation when count exceeds threshold (default: 5).
+
 ## Configuration
 
 Edit `.dev-discipline/config`:

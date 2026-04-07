@@ -40,9 +40,9 @@ Claude Code Hook Event
 
 | Group | Guards dispatched |
 |---|---|
-| `pre-bash` | commit-checks, regression-guard |
+| `pre-bash` | commit-checks, regression-guard, dead-branch-guard, force-push-guard, main-branch-commit-guard |
 | `pre-edit-write` | rare-commits-reminder, tdd-order-tracker |
-| `stop` | rare-commits-reminder |
+| `stop` | rare-commits-reminder, todo-debt-tracker |
 
 Priority: BLOCK (short-circuits) > ASK > WARN > pass. Multiple WARNs are concatenated with ` | `.
 
@@ -83,7 +83,7 @@ Fixture-driven. Each fixture is a JSON file simulating a hook payload.
 
 Test harness (`tests/run.sh`) creates a temp git repo per fixture, sets up guard-specific state (staged files, config, etc.), runs the guard, and validates output.
 
-16 fixtures total, 4 per guard. When adding a new guard: add at least 1 tp and 1 tn fixture.
+37 fixtures total across 8 guards. When adding a new guard: add at least 1 tp and 1 tn fixture.
 
 ## Key conventions
 
