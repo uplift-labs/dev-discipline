@@ -44,36 +44,6 @@ run_fixture() {
 
     # Guard-specific env setup
     case "$guard" in
-      commit-checks)
-        # Create and stage a code file for TDD gate tests
-        case "$fixture_name" in
-          *code-only*|*code-and-test*)
-            mkdir -p src tests
-            echo "x=1" > src/main.py
-            git add src/main.py
-            case "$fixture_name" in
-              *code-and-test*)
-                echo "assert True" > tests/test_main.py
-                git add tests/test_main.py
-                ;;
-            esac
-            git commit -q -m "feat: init"
-            echo "x=2" > src/main.py
-            git add src/main.py
-            case "$fixture_name" in
-              *code-and-test*)
-                echo "assert 1+1==2" > tests/test_main.py
-                git add tests/test_main.py
-                ;;
-            esac
-            ;;
-          *)
-            echo "init" > README.md
-            git add README.md
-            git commit -q -m "feat: init"
-            ;;
-        esac
-        ;;
       rare-commits-reminder)
         echo "init" > README.md
         git add README.md
@@ -111,6 +81,116 @@ run_fixture() {
       tdd-order-tracker)
         # Clean session state
         rm -f /tmp/dd-tdd-tracker-test-session-* 2>/dev/null
+        ;;
+      commit-checks)
+        case "$fixture_name" in
+          *aws-key-staged*)
+            mkdir -p src
+            echo "x=1" > src/main.py
+            git add src/main.py
+            git commit -q -m "feat: init"
+            printf 'AWS_KEY = "AKIAIOSFODNN7EXAMPLE1"\n' > src/config.py
+            git add src/config.py
+            ;;
+          *secret-in-test*)
+            mkdir -p tests
+            echo "x=1" > README.md
+            git add README.md
+            git commit -q -m "feat: init"
+            printf 'MOCK_KEY = "AKIAIOSFODNN7EXAMPLE1"\n' > tests/test_keys.py
+            git add tests/test_keys.py
+            ;;
+          *code-only*|*code-and-test*)
+            mkdir -p src tests
+            echo "x=1" > src/main.py
+            git add src/main.py
+            case "$fixture_name" in
+              *code-and-test*)
+                echo "assert True" > tests/test_main.py
+                git add tests/test_main.py
+                ;;
+            esac
+            git commit -q -m "feat: init"
+            echo "x=2" > src/main.py
+            git add src/main.py
+            case "$fixture_name" in
+              *code-and-test*)
+                echo "assert 1+1==2" > tests/test_main.py
+                git add tests/test_main.py
+                ;;
+            esac
+            ;;
+          *)
+            echo "init" > README.md
+            git add README.md
+            git commit -q -m "feat: init"
+            ;;
+        esac
+        ;;
+      dead-branch-guard)
+        echo "init" > README.md
+        git add README.md
+        git commit -q -m "feat: init"
+        case "$fixture_name" in
+          tp-checkout-main-dirty*|tp-switch-feature-dirty*)
+            echo "dirty" > untracked.txt
+            ;;
+          tn-checkout-new-branch*)
+            echo "dirty" > untracked.txt
+            ;;
+          # tn-checkout-clean: no dirty files
+          # tn-checkout-file-restore: no dirty files needed (-- filter)
+        esac
+        ;;
+      force-push-guard)
+        echo "init" > README.md
+        git add README.md
+        git commit -q -m "feat: init"
+        ;;
+      main-branch-commit-guard)
+        echo "init" > README.md
+        git add README.md
+        git commit -q -m "feat: init"
+        case "$fixture_name" in
+          tp-commit-on-main*)
+            # Already on main (default branch after init) — stay here
+            ;;
+          tp-commit-on-master*)
+            # Rename default branch to master
+            git branch -m master
+            ;;
+          tn-commit-on-feature*)
+            git checkout -q -b feature/x
+            ;;
+          tn-merge-commit-on-main*)
+            # Simulate merge in progress: create MERGE_HEAD
+            _git_dir=$(git rev-parse --git-dir)
+            _head=$(git rev-parse HEAD)
+            printf '%s\n' "$_head" > "$_git_dir/MERGE_HEAD"
+            ;;
+        esac
+        ;;
+      todo-debt-tracker)
+        echo "init" > README.md
+        git add README.md
+        git commit -q -m "feat: init"
+        case "$fixture_name" in
+          tp-new-todos*)
+            printf '// TODO: fix this\n// FIXME: cleanup\ncode();\n' > src.js
+            git add src.js
+            ;;
+          tp-many-todos*)
+            for i in $(seq 1 7); do echo "// TODO: item $i" >> src.js; done
+            git add src.js
+            ;;
+          tn-removed-todos*)
+            printf '// TODO: old item\ncode();\n' > src.js
+            git add src.js
+            git commit -q -m "feat: add src"
+            printf 'code();\n' > src.js
+            ;;
+          # tn-no-todos: clean, no TODO markers
+        esac
         ;;
     esac
 

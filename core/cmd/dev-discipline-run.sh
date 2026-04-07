@@ -26,9 +26,9 @@ GUARD_DIR="$SCRIPT_DIR/../guards"
 
 # Map group to guard list
 case "$GROUP" in
-  pre-bash)        GUARDS="commit-checks regression-guard" ;;
+  pre-bash)        GUARDS="commit-checks regression-guard dead-branch-guard force-push-guard main-branch-commit-guard" ;;
   pre-edit-write)  GUARDS="rare-commits-reminder tdd-order-tracker" ;;
-  stop)            GUARDS="rare-commits-reminder" ;;
+  stop)            GUARDS="rare-commits-reminder todo-debt-tracker" ;;
   *) exit 0 ;;
 esac
 
