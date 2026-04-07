@@ -11,3 +11,17 @@ RARE_COMMITS_MAX_INSERTIONS=100
 # Comma-separated glob patterns to exclude from uncommitted change counts
 # Example: *.lock,*.generated.*,package-lock.json,yarn.lock
 WHITELIST_PATTERNS=
+
+# dead-branch-guard: protected branches (comma-separated, BLOCK on switch)
+DEAD_BRANCH_PROTECTED=main,master
+
+# commit-checks: secret scanning in staged diffs
+SECRET_SCAN_ENABLED=1
+# Comma-separated path prefixes to skip during secret scanning
+SECRET_SCAN_SKIP_PATHS=tests/,fixtures/,__mocks__/
+
+# todo-debt-tracker: net new TODO threshold for ASK vs WARN
+TODO_DEBT_THRESHOLD=5
+
+# main-branch-commit-guard: warn on direct commits to protected branches (1=on, 0=off)
+MAIN_BRANCH_COMMIT_GUARD=1

@@ -50,6 +50,10 @@ core/guards/commit-checks.sh
 core/guards/regression-guard.sh
 core/guards/rare-commits-reminder.sh
 core/guards/tdd-order-tracker.sh
+core/guards/dead-branch-guard.sh
+core/guards/todo-debt-tracker.sh
+core/guards/force-push-guard.sh
+core/guards/main-branch-commit-guard.sh
 core/lib/json-field.sh
 core/lib/config.sh
 adapter/hooks/pre-bash.sh
@@ -167,10 +171,12 @@ echo ""
 echo "dev-discipline $VERSION installed to $DD_DIR"
 echo ""
 echo "Guards:"
-echo "  commit-checks         — conventional commit format"
+echo "  commit-checks         — conventional commit format + secret scanning"
 echo "  regression-guard      — test suite gate before push/merge"
 echo "  rare-commits-reminder — uncommitted work detector"
 echo "  tdd-order-tracker     — test-before-code order tracking"
+echo "  dead-branch-guard     — branch switch with uncommitted changes"
+echo "  todo-debt-tracker     — net new TODO/FIXME debt at session end"
 echo ""
 echo "Configure: $DD_DIR/config"
 echo "Opt-in test gate: echo 'your-test-cmd' > $DD_DIR/test-cmd"

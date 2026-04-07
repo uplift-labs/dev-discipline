@@ -95,9 +95,70 @@ for f in $STAGED; do
   esac
 done
 
-[ "$HAS_CODE" -eq 0 ] && exit 0
-[ "$HAS_TEST" -eq 1 ] && exit 0
+if [ "$HAS_CODE" -eq 1 ] && [ "$HAS_TEST" -eq 0 ]; then
+  CODE_LIST=$(printf '%s' "$CODE_FILES" | sed 's/^ //' | tr ' ' ', ')
+  printf 'WARN:[dev-discipline:commit-checks] Committing code without test files. Code: %s. Consider writing tests for this code.' "$CODE_LIST"
+  exit 0
+fi
 
-CODE_LIST=$(printf '%s' "$CODE_FILES" | sed 's/^ //' | tr ' ' ', ')
-printf 'WARN:[dev-discipline:commit-checks] Committing code without test files. Code: %s. Consider writing tests for this code.' "$CODE_LIST"
+# --- Check 3: Secret leak detection ---
+
+. "$(dirname "$0")/../lib/config.sh"
+: "${SECRET_SCAN_ENABLED:=1}"
+[ "$SECRET_SCAN_ENABLED" != "1" ] && exit 0
+
+: "${SECRET_SCAN_SKIP_PATHS:=tests/,fixtures/,__mocks__/}"
+
+# Get staged diff (added lines only), capped for performance
+SDIFF=$(git diff --cached -U0 2>/dev/null | head -3000)
+[ -z "$SDIFF" ] && exit 0
+
+# Filter out skipped paths: extract current file from diff headers, skip hunks in excluded paths
+_skip_file=0
+ADDED_LINES=""
+while IFS= read -r _line; do
+  case "$_line" in
+    "diff --git "*)
+      _skip_file=0
+      _diff_path=$(printf '%s' "$_line" | sed 's|.*b/||')
+      IFS=',' read -ra _skip_pats <<< "$SECRET_SCAN_SKIP_PATHS"
+      for _sp in "${_skip_pats[@]}"; do
+        _sp=$(printf '%s' "$_sp" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        case "$_diff_path" in
+          ${_sp}*) _skip_file=1 ;;
+        esac
+      done
+      continue
+      ;;
+    +++*) continue ;;
+    +*)
+      [ "$_skip_file" -eq 1 ] && continue
+      ADDED_LINES="${ADDED_LINES}${_line}
+"
+      ;;
+  esac
+done <<< "$SDIFF"
+
+[ -z "$ADDED_LINES" ] && exit 0
+
+# Scan for secret patterns
+SECRET_TYPE=""
+if printf '%s' "$ADDED_LINES" | grep -qE 'AKIA[A-Z0-9]{16}'; then
+  SECRET_TYPE="AWS Access Key ID"
+elif printf '%s' "$ADDED_LINES" | grep -qE 'ghp_[a-zA-Z0-9]{36}'; then
+  SECRET_TYPE="GitHub Personal Access Token"
+elif printf '%s' "$ADDED_LINES" | grep -qE 'gho_[a-zA-Z0-9]{36}'; then
+  SECRET_TYPE="GitHub OAuth Token"
+elif printf '%s' "$ADDED_LINES" | grep -qE 'glpat-[a-zA-Z0-9_-]{20,}'; then
+  SECRET_TYPE="GitLab Personal Access Token"
+elif printf '%s' "$ADDED_LINES" | grep -qE 'sk-[a-zA-Z0-9]{20,}'; then
+  SECRET_TYPE="Secret Key (generic)"
+elif printf '%s' "$ADDED_LINES" | grep -qE '\-\-\-\-\-BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY\-\-\-\-\-'; then
+  SECRET_TYPE="Private Key"
+fi
+
+if [ -n "$SECRET_TYPE" ]; then
+  printf 'BLOCK:[dev-discipline:commit-checks] Potential secret detected in staged changes. Pattern: %s. Remove the secret and use environment variables instead.' "$SECRET_TYPE"
+fi
+
 exit 0
