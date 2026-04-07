@@ -1,0 +1,13 @@
+# dev-discipline configuration
+# Environment variables override these values (prefix: DEV_DISCIPLINE_)
+
+# TDD mode: 0 = soft nudge when code edited before tests, 1 = hard block
+TDD_MODE=0
+
+# Rare commits thresholds (mild; severe = 3x these values)
+RARE_COMMITS_MAX_FILES=5
+RARE_COMMITS_MAX_INSERTIONS=100
+
+# Comma-separated glob patterns to exclude from uncommitted change counts
+# Example: *.lock,*.generated.*,package-lock.json,yarn.lock
+WHITELIST_PATTERNS=
