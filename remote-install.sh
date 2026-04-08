@@ -35,7 +35,12 @@ if [ "${DD_UNINSTALL:-0}" = "1" ]; then
   fi
   SETTINGS="$GIT_ROOT/.claude/settings.json"
   if [ -f "$SETTINGS" ] && grep -q 'dev-discipline' "$SETTINGS" 2>/dev/null; then
-    echo "  NOTE: dev-discipline hooks remain in $SETTINGS — remove manually"
+    if [ -f "$DD_DIR/core/lib/json-merge.py" ]; then
+      python3 "$DD_DIR/core/lib/json-merge.py" "$SETTINGS" --uninstall
+      echo "  Removed dev-discipline hooks from $SETTINGS"
+    else
+      echo "  NOTE: dev-discipline hooks remain in $SETTINGS — remove manually"
+    fi
   fi
   echo "Done."
   exit 0
@@ -56,6 +61,7 @@ core/guards/force-push-guard.sh
 core/guards/main-branch-commit-guard.sh
 core/lib/json-field.sh
 core/lib/config.sh
+core/lib/json-merge.py
 adapter/hooks/pre-bash.sh
 adapter/hooks/pre-edit.sh
 adapter/hooks/stop.sh
@@ -124,24 +130,16 @@ if [ "${DD_WITH_CLAUDE_CODE:-0}" = "1" ]; then
 
   mkdir -p "$SETTINGS_DIR"
 
-  HOOKS_JSON=$(curl -fsSL "$BASE_URL/templates/settings-hooks.json" 2>/dev/null) || HOOKS_JSON=""
+  # Download hooks template
+  HOOKS_SRC="$DD_DIR/settings-hooks.json"
+  curl -fsSL "$BASE_URL/templates/settings-hooks.json" -o "$HOOKS_SRC" 2>/dev/null || true
 
-  if [ -n "$HOOKS_JSON" ]; then
+  if [ -f "$HOOKS_SRC" ]; then
     if [ "$DRY_RUN" = "1" ]; then
       echo "  [dry-run] Merge hooks into $SETTINGS"
     else
-      if [ -f "$SETTINGS" ]; then
-        if ! grep -q 'dev-discipline' "$SETTINGS" 2>/dev/null; then
-          echo "  NOTE: Add dev-discipline hooks to $SETTINGS manually."
-          echo "  Template saved to $DD_DIR/settings-hooks.json"
-          printf '%s' "$HOOKS_JSON" > "$DD_DIR/settings-hooks.json"
-        else
-          echo "  Hooks already present in $SETTINGS"
-        fi
-      else
-        printf '%s' "$HOOKS_JSON" > "$SETTINGS"
-        echo "  Created $SETTINGS with dev-discipline hooks"
-      fi
+      python3 "$DD_DIR/core/lib/json-merge.py" "$SETTINGS" "$HOOKS_SRC"
+      echo "  Merged dev-discipline hooks into $SETTINGS"
     fi
   fi
 
