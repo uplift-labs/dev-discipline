@@ -9,7 +9,9 @@
 #   RARE_COMMITS_MAX_FILES=5
 
 _DD_ROOT="${DEV_DISCIPLINE_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null)}"
-_DD_CONFIG="${_DD_ROOT:-.}/.dev-discipline/config"
+# Derive install dir from this script's location (core/lib/config.sh → install root)
+_DD_INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)"
+_DD_CONFIG="${_DD_INSTALL_DIR:-${_DD_ROOT:-.}/.uplift/dev-discipline}/config"
 
 if [ -f "$_DD_CONFIG" ]; then
   while IFS='=' read -r key value; do

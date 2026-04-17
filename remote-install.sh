@@ -6,6 +6,7 @@
 #
 # Options (via env vars):
 #   DD_VERSION=v0.1.0        Install specific version (default: main)
+#   DD_PREFIX=.uplift         Install prefix directory (default: .uplift)
 #   DD_WITH_CLAUDE_CODE=1    Merge hooks into .claude/settings.json + inject CLAUDE.md rules
 #   DD_UNINSTALL=1           Remove dev-discipline
 #   DD_DRY_RUN=1             Show what would be done without doing it
@@ -13,6 +14,7 @@
 set -eu
 
 VERSION="${DD_VERSION:-main}"
+PREFIX="${DD_PREFIX:-.uplift}"
 BASE_URL="https://raw.githubusercontent.com/uplift-labs/dev-discipline/$VERSION"
 DRY_RUN="${DD_DRY_RUN:-0}"
 
@@ -22,21 +24,35 @@ GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || {
   exit 1
 }
 
-DD_DIR="$GIT_ROOT/.dev-discipline"
+# --- Migration from legacy path ---
+migrate_old_path() {
+  local old="$1" new="$2"
+  [ -d "$old" ] || return 0
+  [ -d "$new" ] && { printf '[migrate] both %s and %s exist — manual merge needed\n' "$old" "$new" >&2; return 1; }
+  mkdir -p "$(dirname "$new")"
+  mv "$old" "$new"
+  printf '[migrate] moved %s → %s\n' "$old" "$new"
+}
+
+DD_DIR="$GIT_ROOT/$PREFIX/dev-discipline"
 
 # --- Uninstall ---
 if [ "${DD_UNINSTALL:-0}" = "1" ]; then
   echo "Uninstalling dev-discipline..."
-  if [ -d "$DD_DIR" ]; then
-    rm -rf "$DD_DIR"
-    echo "  Removed $DD_DIR"
-  else
-    echo "  $DD_DIR not found — nothing to remove"
-  fi
+  _MERGER=""
+  # Check new path first, then legacy path
+  for _try_dir in "$DD_DIR" "$GIT_ROOT/.dev-discipline"; do
+    if [ -d "$_try_dir" ]; then
+      [ -f "$_try_dir/core/lib/json-merge.py" ] && _MERGER="$_try_dir/core/lib/json-merge.py"
+      rm -rf "$_try_dir"
+      echo "  Removed $_try_dir"
+    fi
+  done
+  [ -z "$_MERGER" ] && echo "  No dev-discipline directory found — nothing to remove"
   SETTINGS="$GIT_ROOT/.claude/settings.json"
   if [ -f "$SETTINGS" ] && grep -q 'dev-discipline' "$SETTINGS" 2>/dev/null; then
-    if [ -f "$DD_DIR/core/lib/json-merge.py" ]; then
-      python3 "$DD_DIR/core/lib/json-merge.py" "$SETTINGS" --uninstall
+    if [ -n "$_MERGER" ] && [ -f "$_MERGER" ]; then
+      python3 "$_MERGER" "$SETTINGS" --uninstall
       echo "  Removed dev-discipline hooks from $SETTINGS"
     else
       echo "  NOTE: dev-discipline hooks remain in $SETTINGS — remove manually"
@@ -47,6 +63,7 @@ if [ "${DD_UNINSTALL:-0}" = "1" ]; then
 fi
 
 # --- Install ---
+migrate_old_path "$GIT_ROOT/.dev-discipline" "$DD_DIR"
 echo "Installing dev-discipline $VERSION..."
 
 FILES="
@@ -130,9 +147,12 @@ if [ "${DD_WITH_CLAUDE_CODE:-0}" = "1" ]; then
 
   mkdir -p "$SETTINGS_DIR"
 
-  # Download hooks template
+  # Download hooks template and patch paths for actual PREFIX
   HOOKS_SRC="$DD_DIR/settings-hooks.json"
   curl -fsSL "$BASE_URL/templates/settings-hooks.json" -o "$HOOKS_SRC" 2>/dev/null || true
+  if [ -f "$HOOKS_SRC" ]; then
+    sed -i "s|/\\.dev-discipline/adapter/hooks/|/$PREFIX/dev-discipline/adapter/hooks/|g" "$HOOKS_SRC"
+  fi
 
   if [ -f "$HOOKS_SRC" ]; then
     if [ "$DRY_RUN" = "1" ]; then
