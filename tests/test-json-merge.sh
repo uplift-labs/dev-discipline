@@ -7,6 +7,7 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MERGE="$ROOT/core/lib/json-merge.py"
+TOML_FEATURE="$ROOT/core/lib/toml-feature.py"
 
 PASS=0
 FAIL=0
@@ -195,6 +196,51 @@ EOF
 python3 "$MERGE" "$TMPDIR/target6.json" "$TMPDIR/hooks6.json"
 MATCHER_COUNT=$(json_query "$TMPDIR/target6.json" "len(d['hooks']['PreToolUse'])")
 check "merge adds new matcher groups" "2" "$MATCHER_COUNT"
+
+# --- Test 7: uninstall recognizes Codex adapter hooks ---
+cat > "$TMPDIR/target7.json" << 'EOF'
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.uplift/dev-discipline/adapter/codex/hooks/pre-bash.sh\""
+          },
+          {
+            "type": "command",
+            "command": "echo existing"
+          }
+        ]
+      }
+    ]
+  }
+}
+EOF
+python3 "$MERGE" "$TMPDIR/target7.json" --uninstall
+DD_HOOKS2=$(json_query "$TMPDIR/target7.json" \
+  "sum(1 for h in d['hooks']['PreToolUse'][0]['hooks'] if 'dev-discipline' in h.get('command',''))")
+check "uninstall removes Codex hooks" "0" "$DD_HOOKS2"
+
+OTHER_HOOKS2=$(json_query "$TMPDIR/target7.json" "len(d['hooks']['PreToolUse'][0]['hooks'])")
+check "uninstall keeps non-Codex hooks" "1" "$OTHER_HOOKS2"
+
+# --- Test 8: enable Codex hooks feature in TOML config ---
+cat > "$TMPDIR/config.toml" << 'EOF'
+model = "gpt-5.5"
+
+[features]
+multi_agent = true
+EOF
+python3 "$TOML_FEATURE" "$TMPDIR/config.toml" codex_hooks
+CODEX_FEATURE=$(grep -c '^codex_hooks = true$' "$TMPDIR/config.toml" || true)
+check "toml feature enabled" "1" "$CODEX_FEATURE"
+
+python3 "$TOML_FEATURE" "$TMPDIR/config.toml" codex_hooks
+CODEX_FEATURE_ONCE=$(grep -c '^codex_hooks = true$' "$TMPDIR/config.toml" || true)
+check "toml feature merge is idempotent" "1" "$CODEX_FEATURE_ONCE"
 
 # --- Summary ---
 echo ""

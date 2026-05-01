@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """dev-discipline JSON merge tool.
 
-Merges hook definitions into an existing Claude Code settings.json.
+Merges hook definitions into an existing agent hooks/settings JSON file.
 Idempotent: running twice produces the same result.
 
 Usage:
@@ -11,8 +11,12 @@ import json
 import sys
 from pathlib import Path
 
-MARKER = "/dev-discipline/adapter/hooks/"
-LEGACY_MARKERS = [".dev-discipline/adapter/hooks/"]
+MARKERS = [
+    "/dev-discipline/adapter/hooks/",
+    "/dev-discipline/adapter/codex/hooks/",
+    ".dev-discipline/adapter/hooks/",
+    ".dev-discipline/adapter/codex/hooks/",
+]
 
 
 def hook_key(hook):
@@ -27,9 +31,7 @@ def hook_key(hook):
 def is_dd_hook(hook):
     """Check if a hook was installed by dev-discipline."""
     cmd = hook.get("command", "")
-    if MARKER in cmd:
-        return True
-    return any(m in cmd for m in LEGACY_MARKERS)
+    return any(m in cmd for m in MARKERS)
 
 
 def merge_matcher_group(existing_group, new_group):

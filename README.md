@@ -19,6 +19,14 @@ With Claude Code hook integration:
 curl -fsSL https://raw.githubusercontent.com/uplift-labs/dev-discipline/main/remote-install.sh | DD_WITH_CLAUDE_CODE=1 bash
 ```
 
+With Codex hook integration:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/uplift-labs/dev-discipline/main/remote-install.sh | DD_WITH_CODEX=1 bash
+```
+
+Codex support installs project-local hooks in `.codex/hooks.json`, enables `features.codex_hooks = true` in `.codex/config.toml`, and adds dev-discipline guidance to `AGENTS.md`. Codex only loads project-local `.codex/` configuration for trusted projects.
+
 ## Guards
 
 ### commit-checks
@@ -27,10 +35,10 @@ Validates conventional commit format (`type(scope): description`) and warns when
 ### regression-guard
 **Nudge mode** (default): Warns before `git push` / `git merge main` to run the full test suite. Auto-detects your test runner and suggests the command.
 
-**Gate mode** (opt-in): Create `.dev-discipline/test-cmd` with your test command. The guard will run it and block push/merge if tests fail.
+**Gate mode** (opt-in): Create `.uplift/dev-discipline/test-cmd` with your test command. The guard will run it and block push/merge if tests fail.
 
 ```bash
-echo "npm test" > .dev-discipline/test-cmd
+echo "npm test" > .uplift/dev-discipline/test-cmd
 ```
 
 ### rare-commits-reminder
@@ -41,9 +49,10 @@ Tracks whether tests are written before code in each session. Soft nudge by defa
 
 ```bash
 # Option 1: config file
-echo "TDD_MODE=1" >> .dev-discipline/config
+echo "TDD_MODE=1" >> .uplift/dev-discipline/config
 
 # Option 2: marker file
+mkdir -p .dev-discipline
 touch .dev-discipline/.tdd-mode
 
 # Option 3: environment variable
@@ -62,9 +71,25 @@ Warns when committing directly to a protected branch (main/master). Encourages f
 ### todo-debt-tracker
 Counts net new `TODO`/`FIXME`/`HACK`/`XXX` markers in uncommitted changes at session end. Warns when new markers appear; asks for confirmation when count exceeds threshold (default: 5).
 
+## Agent integrations
+
+### Claude Code
+
+Claude Code integration uses `PreToolUse` hooks for Bash/Edit/Write and a `Stop` hook for session-end checks. `BLOCK`, `ASK`, and `WARN` map to Claude Code's hook response format.
+
+### Codex
+
+Codex integration uses `PreToolUse` hooks for `Bash` and `apply_patch` plus a `Stop` hook. `BLOCK` maps to a Codex deny decision. `WARN` maps to `systemMessage`. Codex `PreToolUse` does not currently support interactive `ask`, so `ASK` maps to deny by default. To make `ASK` non-blocking in Codex, set:
+
+```bash
+export DEV_DISCIPLINE_CODEX_ASK_BEHAVIOR=warn
+```
+
+Codex edit tracking is based on file paths extracted from `apply_patch` payloads. Shell commands that modify files directly are still covered by Bash guards, but they do not provide per-file edit paths for `tdd-order-tracker`.
+
 ## Configuration
 
-Edit `.dev-discipline/config`:
+Edit `.uplift/dev-discipline/config`:
 
 ```bash
 TDD_MODE=0                     # 0=nudge, 1=block
@@ -98,13 +123,16 @@ curl -fsSL https://raw.githubusercontent.com/uplift-labs/dev-discipline/main/rem
 
 ```bash
 bash tests/run.sh
+bash tests/test-adapter-codex.sh
+bash tests/test-json-merge.sh
 ```
 
 ## Requirements
 
 - bash 4+
 - git
-- No other dependencies
+- Guard runtime has no other dependencies
+- Hook integration merge helpers use python3 during install/uninstall
 
 ## License
 
