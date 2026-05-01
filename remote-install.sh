@@ -8,6 +8,7 @@
 #   DD_VERSION=v0.1.0        Install specific version (default: main)
 #   DD_PREFIX=.uplift         Install prefix directory (default: .uplift)
 #   DD_WITH_CLAUDE_CODE=1    Merge hooks into .claude/settings.json + inject CLAUDE.md rules
+#   DD_WITH_CODEX=1          Merge hooks into .codex/hooks.json + inject AGENTS.md rules
 #   DD_UNINSTALL=1           Remove dev-discipline
 #   DD_DRY_RUN=1             Show what would be done without doing it
 
@@ -44,11 +45,11 @@ if [ "${DD_UNINSTALL:-0}" = "1" ]; then
   for _try_dir in "$DD_DIR" "$GIT_ROOT/.dev-discipline"; do
     if [ -d "$_try_dir" ]; then
       [ -f "$_try_dir/core/lib/json-merge.py" ] && _MERGER="$_try_dir/core/lib/json-merge.py"
-      rm -rf "$_try_dir"
-      echo "  Removed $_try_dir"
     fi
   done
+
   [ -z "$_MERGER" ] && echo "  No dev-discipline directory found — nothing to remove"
+
   SETTINGS="$GIT_ROOT/.claude/settings.json"
   if [ -f "$SETTINGS" ] && grep -q 'dev-discipline' "$SETTINGS" 2>/dev/null; then
     if [ -n "$_MERGER" ] && [ -f "$_MERGER" ]; then
@@ -58,6 +59,24 @@ if [ "${DD_UNINSTALL:-0}" = "1" ]; then
       echo "  NOTE: dev-discipline hooks remain in $SETTINGS — remove manually"
     fi
   fi
+
+  CODEX_HOOKS="$GIT_ROOT/.codex/hooks.json"
+  if [ -f "$CODEX_HOOKS" ] && grep -q 'dev-discipline' "$CODEX_HOOKS" 2>/dev/null; then
+    if [ -n "$_MERGER" ] && [ -f "$_MERGER" ]; then
+      python3 "$_MERGER" "$CODEX_HOOKS" --uninstall
+      echo "  Removed dev-discipline hooks from $CODEX_HOOKS"
+    else
+      echo "  NOTE: dev-discipline hooks remain in $CODEX_HOOKS — remove manually"
+    fi
+  fi
+
+  for _try_dir in "$DD_DIR" "$GIT_ROOT/.dev-discipline"; do
+    if [ -d "$_try_dir" ]; then
+      rm -rf "$_try_dir"
+      echo "  Removed $_try_dir"
+    fi
+  done
+
   echo "Done."
   exit 0
 fi
@@ -79,9 +98,13 @@ core/guards/main-branch-commit-guard.sh
 core/lib/json-field.sh
 core/lib/config.sh
 core/lib/json-merge.py
+core/lib/toml-feature.py
 adapter/hooks/pre-bash.sh
 adapter/hooks/pre-edit.sh
 adapter/hooks/stop.sh
+adapter/codex/hooks/pre-bash.sh
+adapter/codex/hooks/pre-edit.sh
+adapter/codex/hooks/stop.sh
 "
 
 # Create directories
@@ -185,6 +208,60 @@ if [ "${DD_WITH_CLAUDE_CODE:-0}" = "1" ]; then
   fi
 fi
 
+# --- Codex integration ---
+if [ "${DD_WITH_CODEX:-0}" = "1" ]; then
+  echo "  Integrating with Codex..."
+  CODEX_DIR="$GIT_ROOT/.codex"
+  CODEX_HOOKS="$CODEX_DIR/hooks.json"
+  CODEX_CONFIG="$CODEX_DIR/config.toml"
+
+  mkdir -p "$CODEX_DIR"
+
+  # Download hooks template and patch paths for actual PREFIX
+  CODEX_HOOKS_SRC="$DD_DIR/codex-hooks.json"
+  curl -fsSL "$BASE_URL/templates/codex-hooks.json" -o "$CODEX_HOOKS_SRC" 2>/dev/null || true
+  if [ -f "$CODEX_HOOKS_SRC" ]; then
+    sed -i "s|/\\.dev-discipline/adapter/codex/hooks/|/$PREFIX/dev-discipline/adapter/codex/hooks/|g" "$CODEX_HOOKS_SRC"
+  fi
+
+  if [ -f "$CODEX_HOOKS_SRC" ]; then
+    if [ "$DRY_RUN" = "1" ]; then
+      echo "  [dry-run] Merge Codex hooks into $CODEX_HOOKS"
+    else
+      python3 "$DD_DIR/core/lib/json-merge.py" "$CODEX_HOOKS" "$CODEX_HOOKS_SRC"
+      echo "  Merged dev-discipline hooks into $CODEX_HOOKS"
+    fi
+  fi
+
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "  [dry-run] Enable features.codex_hooks in $CODEX_CONFIG"
+  else
+    python3 "$DD_DIR/core/lib/toml-feature.py" "$CODEX_CONFIG" codex_hooks
+    echo "  Enabled Codex hooks in $CODEX_CONFIG"
+  fi
+
+  # Inject AGENTS.md rules
+  AGENTS_MD="$GIT_ROOT/AGENTS.md"
+  RULES=$(curl -fsSL "$BASE_URL/templates/agents-md-rules.md" 2>/dev/null) || RULES=""
+  if [ -n "$RULES" ]; then
+    if [ "$DRY_RUN" = "1" ]; then
+      echo "  [dry-run] Append rules to $AGENTS_MD"
+    else
+      if [ -f "$AGENTS_MD" ]; then
+        if ! grep -q 'dev-discipline' "$AGENTS_MD" 2>/dev/null; then
+          printf '\n%s\n' "$RULES" >> "$AGENTS_MD"
+          echo "  Appended rules to $AGENTS_MD"
+        else
+          echo "  Rules already present in $AGENTS_MD"
+        fi
+      else
+        printf '%s\n' "$RULES" > "$AGENTS_MD"
+        echo "  Created $AGENTS_MD with dev-discipline rules"
+      fi
+    fi
+  fi
+fi
+
 echo ""
 echo "dev-discipline $VERSION installed to $DD_DIR"
 echo ""
@@ -194,6 +271,8 @@ echo "  regression-guard      — test suite gate before push/merge"
 echo "  rare-commits-reminder — uncommitted work detector"
 echo "  tdd-order-tracker     — test-before-code order tracking"
 echo "  dead-branch-guard     — branch switch with uncommitted changes"
+echo "  force-push-guard      — force push protection"
+echo "  main-branch-commit-guard — protected branch commit reminder"
 echo "  todo-debt-tracker     — net new TODO/FIXME debt at session end"
 echo ""
 echo "Configure: $DD_DIR/config"

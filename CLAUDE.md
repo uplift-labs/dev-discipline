@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-dev-discipline — development hygiene guards for AI coding agents. Enforces commit discipline, test-before-push, TDD order, and conventional commits via Claude Code hooks. Pure bash, no external dependencies, no network/LLM calls, fail-open by design.
+dev-discipline — development hygiene guards for AI coding agents. Enforces commit discipline, test-before-push, TDD order, and conventional commits via agent hooks for Claude Code and Codex. Pure bash, no external dependencies, no network/LLM calls, fail-open by design.
 
 Part of the uplift-labs trilogy: safeguard (dangerous actions), worktree-sandbox (session isolation), dev-discipline (hygiene).
 
@@ -13,6 +13,8 @@ Part of the uplift-labs trilogy: safeguard (dangerous actions), worktree-sandbox
 ```bash
 # Run all tests
 bash tests/run.sh
+bash tests/test-adapter-codex.sh
+bash tests/test-json-merge.sh
 
 # Run tests for a single guard
 bash tests/run.sh commit-checks
@@ -28,12 +30,12 @@ No build step, no linter, no package manager. Requirements: bash 4+, git.
 ### Guard dispatch flow
 
 ```
-Claude Code Hook Event
-  -> adapter/hooks/{pre-bash,pre-edit,stop}.sh    # translates hook JSON to stdin
+Agent Hook Event (Claude Code or Codex)
+  -> adapter/hooks/*.sh or adapter/codex/hooks/*.sh
     -> core/cmd/dev-discipline-run.sh <group>      # multiplexer: dispatches to guards
       -> core/guards/{guard-name}.sh               # individual guard logic
     <- BLOCK:|ASK:|WARN:|empty                     # guard verdict (prefix-based)
-  <- Claude Code JSON                              # adapter converts back
+  <- Agent-specific JSON                           # adapter converts back
 ```
 
 ### Multiplexer groups (dev-discipline-run.sh)
@@ -56,14 +58,19 @@ Guards communicate exclusively via stdout prefix strings:
 
 All guards exit 0 always (fail-open). Exit code is never used for signaling.
 
-### Adapters (adapter/hooks/)
+### Adapters
 
-Convert between Claude Code hook JSON format and the internal prefix protocol. Three adapters map to three hook events: `pre-bash.sh` (PreToolUse Bash), `pre-edit.sh` (PreToolUse Edit|Write), `stop.sh` (Stop).
+Adapters convert between agent hook JSON and the internal prefix protocol.
+
+- `adapter/hooks/` — Claude Code adapters for `PreToolUse Bash`, `PreToolUse Edit|Write`, and `Stop`.
+- `adapter/codex/hooks/` — Codex adapters for `PreToolUse Bash`, `PreToolUse apply_patch`, and `Stop`.
+
+Codex `PreToolUse` does not currently support interactive `ask`; Codex adapters map `ASK:` to deny by default unless `DEV_DISCIPLINE_CODEX_ASK_BEHAVIOR=warn`.
 
 ### Configuration layering
 
 1. Hardcoded defaults in guards
-2. `.dev-discipline/config` (shell-sourceable key=value)
+2. Installed config file, default `.uplift/dev-discipline/config` (shell-sourceable key=value)
 3. Environment variables (`DEV_DISCIPLINE_` prefix overrides config)
 4. Per-guard disable: `DEV_DISCIPLINE_DISABLE_COMMIT_CHECKS=1` (dashes to underscores, uppercased)
 
@@ -83,7 +90,7 @@ Fixture-driven. Each fixture is a JSON file simulating a hook payload.
 
 Test harness (`tests/run.sh`) creates a temp git repo per fixture, sets up guard-specific state (staged files, config, etc.), runs the guard, and validates output.
 
-37 fixtures total across 8 guards. When adding a new guard: add at least 1 tp and 1 tn fixture.
+37 fixtures total across 8 guards, plus adapter-level tests for Codex hook payloads. When adding a new guard: add at least 1 tp and 1 tn fixture. When changing an adapter: add or update an adapter test.
 
 ## Key conventions
 
